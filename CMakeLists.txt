@@ -1,16 +1,21 @@
-PROJECT(ucca)
-CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
-SET(CMAKE_INCLUDE_CURRENT_DIR ON)
+project(ucca)
+cmake_minimum_required(VERSION 2.8)
 
-# look for Boost
-if(DEFINED ENV{BOOST_ROOT})
-  set(Boost_NO_SYSTEM_PATHS ON)
+set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
+
+enable_testing()
+
+find_package(RapidXML)
+
+if(NOT RAPIDXML_FOUND)
+    message(STATUS "RapidXML not found - using internal version.")
+    set(RapidXML_INCLUDE_DIR "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/rapidxml/>" CACHE PATH "Include directory for RapidXML" FORCE)
+    file(GLOB RapidXML_HEADERS ${PROJECT_SOURCE_DIR}/rapidxml/*.hpp)
+    install(FILES ${RapidXML_HEADERS} DESTINATION include)
 endif()
-set(Boost_REALPATH ON)
-find_package(Boost COMPONENTS program_options serialization iostreams system filesystem REQUIRED)
-include_directories(${Boost_INCLUDE_DIR})
-set(LIBS ${LIBS} ${Boost_LIBRARIES})
 
-ADD_EXECUTABLE(passage passage.cc)
-target_link_libraries(passage ${Boost_LIBRARIES})
+find_package(Boost COMPONENTS system filesystem REQUIRED)
 
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+
+add_subdirectory(ucca)

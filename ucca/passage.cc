@@ -5,15 +5,14 @@
 #include <vector>
 #include <string.h>
 
-#include <boost/filesystem.hpp>
-
 #include <rapidxml/rapidxml_print.hpp>
 #include <rapidxml/rapidxml.hpp>
 
-#include "passage.h"
+#include "ucca/passage.h"
 
-using namespace rapidxml;
 using namespace std;
+using namespace rapidxml;
+using namespace ucca;
 
 Passage::Passage(unsigned id)
     : id(id), annotation_id(0)
@@ -230,18 +229,6 @@ Node::Node(string id, string type)
 Node::~Node() {}
 
 Edge::Edge(Node* from, string to_id, string type)
-    : to_id(to_id), type(type), remote(false), from(from) {}
+    : type(type), remote(false), from(from), to_id(to_id) {}
 
 Edge::~Edge() {}
-
-int main(int argc, char** argv) {
-  if (argc < 2) exit(0);
-  boost::filesystem::path in_dir(argv[1]);
-  boost::filesystem::path out_dir(argv[2]);
-  for (auto it = boost::filesystem::directory_iterator(in_dir); it != boost::filesystem::directory_iterator(); ++it) {
-    Passage* passage = Passage::load(it->path().c_str());
-    string outfname = out_dir.string() + boost::filesystem::path::preferred_separator +
-        boost::filesystem::basename(it->path()) + boost::filesystem::extension(it->path());
-    passage->save(outfname.c_str());
-  }
-}
