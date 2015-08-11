@@ -12,87 +12,69 @@
 #include <fstream>
 #include <algorithm>
 
+#include "cmp_id.h"
+#include "exceptions.h"
+
 namespace ucca {
 
   class Passage;
-
   class Layer;
-
   class Node;
-
   class Edge;
 
-  struct cmp_id {
-    static char dot_to_space(const char c) {
-      return c == '.' ? ' ' : c;
-    }
+  // layer 0 node types
+  static const char *const PUNCTUATION = "Punctuation";
+  static const char *const WORD = "Word";
 
-    static std::vector<unsigned> split_id(const std::string &s) {
-      std::vector<unsigned> n;
-      std::string s_spaces;
-      std::transform(s.begin(), s.end(), std::back_inserter(s_spaces), dot_to_space);
-      std::stringstream ss(s_spaces);
-      std::copy(std::istream_iterator<unsigned>(ss), std::istream_iterator<unsigned>(), std::back_inserter(n));
-      return n;
-    }
+  // layer 1 node types
+  static const char *const FN = "FN";
+  static const char *const PNCT = "PNCT";
+  static const char *const LKG = "LKG";
 
-    bool operator()(const std::string &a, const std::string &b) const {
-      std::vector<unsigned> a_n = split_id(a);
-      std::vector<unsigned> b_n = split_id(b);
-      return a_n < b_n;
-    }
-  };
+  // edge types: foundational layer
+  static const char *const A = "A";
+  static const char *const P = "P";
+  static const char *const S = "S";
+  static const char *const D = "D";
+  static const char *const C = "C";
+  static const char *const E = "E";
+  static const char *const N = "N";
+  static const char *const R = "R";
+  static const char *const H = "H";
+  static const char *const L = "L";
+  static const char *const F = "F";
+  static const char *const G = "G";
 
-  struct cmp_id_pair {
-    bool operator()(const std::pair<std::string, std::string> &a,
-                    const std::pair<std::string, std::string> &b) const {
-      cmp_id cmp;
-      if (cmp(a.first, b.first)) return true;
-      else if (a.first == b.first && cmp(a.second, b.second)) return true;
-      else return false;
-    }
-  };
+  // edge types: linkage
+  static const char *const LR = "LR";
+  static const char *const LA = "LA";
 
-  class xml_exception : public std::runtime_error {
-  public:
-    xml_exception(const std::string &s) : runtime_error(s) { }
-  };
-
-  class file_not_found_exception : public std::runtime_error {
-  public:
-    file_not_found_exception(const char *fname) : runtime_error(std::string("File not found: ") + fname) { }
-  };
+  // edge types: preterminals
+  static const char *const T = "T";
+  static const char *const U = "U";
 
   class Passage {
   public:
     Passage(unsigned id);
-
     ~Passage();
 
-    static Passage *load(const char *fname) {
-      std::ifstream in;
-      in.open(fname);
-      if (!in.is_open()) throw file_not_found_exception(fname);
-      auto p = load(in);
-      in.close();
-      return p;
-    }
-
-    static Passage *load(const std::string &s) { return load(s.c_str()); }
-
+    static Passage *load(const std::string);
     static Passage *load(std::istream &);
 
-    void save(const char *fname) const {
-      std::ofstream out;
-      out.open(fname);
-      if (!out.is_open()) throw file_not_found_exception(fname);
-      save(out);
-      out.close();
-    }
-
-    void save(const std::string &s) const { save(s.c_str()); }
-
+    void save(const std::string);
     void save(std::ostream &) const;
+
+    Node* add_node(unsigned layer_id, Node* node);
+    Node* add_node(unsigned layer_id, std::string node_id, const std::string& type);
+    Node* add_node(unsigned layer_id, unsigned position, const std::string& type);
+
+    Node* add_terminal(unsigned position, unsigned paragraph, unsigned paragraph_position,
+                       const std::string& text);
+
+    Edge* add_edge(unsigned layer_id, Node* node1, Node* node2, std::string type);
+    Edge* add_edge(unsigned layer_id, std::string id1, std::string id2, std::string type);
+    Edge* add_edge(unsigned int layer_id1, unsigned int position1,
+                   unsigned int layer_id2, unsigned int position2, std::string type);
 
     unsigned id;
     unsigned annotation_id;
@@ -101,7 +83,8 @@ namespace ucca {
     std::map<std::pair<std::string, std::string>, Edge *, cmp_id_pair> edges;
 
   private:
-    Passage() : id(0), annotation_id(0) { };
+    Passage() : id(0), annotation_id(0) {};
+    Edge* add_edge(unsigned layer_id, Node *node1, std::string id2, std::string type);
   };
 
   class Layer {
@@ -109,7 +92,6 @@ namespace ucca {
     friend class Passage;
 
     Layer(unsigned id);
-
     ~Layer();
 
     unsigned id;
@@ -121,8 +103,7 @@ namespace ucca {
   public:
     friend class Passage;
 
-    Node(std::string id, std::string type);
-
+    Node(Layer *layer, std::string id, std::string type);
     ~Node();
 
     std::string id;
@@ -133,17 +114,23 @@ namespace ucca {
     bool implicit;
     bool uncertain;
     std::string remarks;
-    std::map<std::string, Edge *, cmp_id> edges;
+    Layer *layer;
+    std::map<std::string, Edge *, cmp_id> outgoing;
+    std::map<std::string, Edge *, cmp_id> incoming;
   };
 
   class Edge {
   public:
     friend class Passage;
 
+    Edge(Node *from, Node *to, std::string type);
     Edge(Node *from, std::string to_id, std::string type);
-
     ~Edge();
 
+  private:
+    Edge(Node *from, Node *to, std::string type, std::string to_id);
+
+  public:
     std::string type;
     bool remote;
     Node *from;

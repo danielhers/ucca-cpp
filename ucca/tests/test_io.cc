@@ -7,6 +7,7 @@
 #include "ucca/passage.h"
 
 using namespace std;
+using namespace ucca;
 
 int main(int argc, char** argv) {
   if (argc < 2) exit(0);

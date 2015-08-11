@@ -3,6 +3,7 @@
 //
 #include <iostream>
 #include <vector>
+#include <cctype>
 #include <string.h>
 
 #include <rapidxml/rapidxml_print.hpp>
@@ -19,6 +20,16 @@ Passage::Passage(unsigned id)
 {
   layers[0] = new Layer(0);
   layers[1] = new Layer(1);
+  add_node(1, 1, FN); // root node
+}
+
+Passage* Passage::load(const string fname) {
+  std::ifstream in;
+  in.open(fname);
+  if (!in.is_open()) throw file_not_found_exception(fname);
+  auto p = load(in);
+  in.close();
+  return p;
 }
 
 Passage* Passage::load(istream& in)
@@ -67,9 +78,7 @@ Passage* Passage::load(istream& in)
                                   "\" in layer " + to_string(layer_id));
         }
       }
-      Node *node = new Node(node_id, node_type);
-      p->nodes[node_id] = node;
-      layer->nodes[node_id] = node;
+      Node *node = p->add_node(layer_id, node_id, node_type);
       for (xml_node<> *attributes_node = node_node->first_node("attributes"); attributes_node;
            attributes_node = attributes_node->next_sibling("attributes"))
       {
@@ -117,10 +126,7 @@ Passage* Passage::load(istream& in)
             throw xml_exception(string("Unknown edge attribute \"") + attr->name() + "\" in node " + node_id);
           }
         }
-        Edge *edge = new Edge(node, edge_to_id, edge_type);
-        p->edges[make_pair(node_id, edge_to_id)] = edge;
-        layer->edges[make_pair(node_id, edge_to_id)] = edge;
-        node->edges[edge_to_id] = edge;
+        Edge *edge = p->add_edge(layer_id, node, edge_to_id, edge_type);
         for (xml_node<> *attributes_node = edge_node->first_node("attributes"); attributes_node;
              attributes_node = attributes_node->next_sibling("attributes"))
         {
@@ -138,7 +144,9 @@ Passage* Passage::load(istream& in)
     } // node
   } // layer
   for(auto it = p->edges.begin(); it != p->edges.end(); ++it) {
-    it->second->to = p->nodes[it->second->to_id];
+    auto edge = it->second;
+    edge->to = p->nodes[edge->to_id];
+    edge->to->incoming[edge->from->id] = edge;
   }
   return p;
 }
@@ -147,6 +155,14 @@ Passage::~Passage() {
   for(auto it = layers.begin(); it != layers.end(); ++it) delete it->second;
   for(auto it = nodes.begin() ; it != nodes.end() ; ++it) delete it->second;
   for(auto it = edges.begin() ; it != edges.end() ; ++it) delete it->second;
+}
+
+void Passage::save(const string fname) const {
+  std::ofstream out;
+  out.open(fname);
+  if (!out.is_open()) throw file_not_found_exception(fname);
+  save(out);
+  out.close();
 }
 
 static const char* str(xml_document<>& doc, const string& s) {
@@ -167,13 +183,13 @@ void Passage::save(ostream& os) const {
   for(map<unsigned, Layer*>::const_iterator layer_it = layers.begin(); layer_it != layers.end(); ++layer_it) {
     xml_node<> *layer = doc.allocate_node(node_element, "layer");
     root->append_node(layer);
-    layer->append_attribute(doc.allocate_attribute("layerID", str(doc, layer_it->second->id)));
+    layer->append_attribute(doc.allocate_attribute("layerID", str(doc, layer_it->first)));
     layer->append_node(doc.allocate_node(node_element, "attributes"));
     for(map<string, Node*>::const_iterator node_it = layer_it->second->nodes.begin();
         node_it != layer_it->second->nodes.end(); ++node_it) {
       xml_node<> *node = doc.allocate_node(node_element, "node");
       layer->append_node(node);
-      node->append_attribute(doc.allocate_attribute("ID", str(doc, node_it->second->id)));
+      node->append_attribute(doc.allocate_attribute("ID", str(doc, node_it->first)));
       node->append_attribute(doc.allocate_attribute("type", str(doc, node_it->second->type)));
       xml_node<> *attributes = doc.allocate_node(node_element, "attributes");
       node->append_node(attributes);
@@ -199,8 +215,8 @@ void Passage::save(ostream& os) const {
         node->append_node(extra);
         extra->append_attribute(doc.allocate_attribute("remarks", str(doc, node_it->second->remarks)));
       }
-      for(map<string, Edge*>::const_iterator edge_it = node_it->second->edges.begin();
-          edge_it != node_it->second->edges.end(); ++edge_it) {
+      for(map<string, Edge*>::const_iterator edge_it = node_it->second->outgoing.begin();
+          edge_it != node_it->second->outgoing.end(); ++edge_it) {
         xml_node<> *edge = doc.allocate_node(node_element, "edge");
         node->append_node(edge);
         edge->append_attribute(doc.allocate_attribute("toID", str(doc, edge_it->second->to_id)));
@@ -216,19 +232,82 @@ void Passage::save(ostream& os) const {
   os << doc;
 }
 
-Layer::Layer(unsigned id)
-    : id(id) {}
+Node* Passage::add_node(unsigned layer_id, Node* node) {
+  nodes[node->id] = node;
+  layers[layer_id]->nodes[node->id] = node;
+  return node;
+}
 
+Node* Passage::add_node(unsigned layer_id, string node_id, const string& type) {
+  Node* node = new Node(layers[layer_id], node_id, type);
+  nodes[node_id] = node;
+  layers[layer_id]->nodes[node_id] = node;
+  return node;
+}
+
+static string make_id(unsigned int layer_id, unsigned int position) {
+  return to_string(layer_id) + '.' + to_string(position);
+}
+
+Node* Passage::add_node(unsigned layer_id, unsigned position, const string& type) {
+  return add_node(layer_id, make_id(layer_id, position), type);
+}
+
+Node* Passage::add_terminal(unsigned position, unsigned paragraph, unsigned paragraph_position,
+                            const string& text) {
+  string type = all_of(text.begin(), text.end(), (int(*)(int))ispunct) ? PUNCTUATION : WORD;
+  Node* node = add_node(0, make_id(0, position), type);
+  node->paragraph = paragraph;
+  node->paragraph_position = paragraph_position;
+  node->text = text;
+  return node;
+}
+
+Edge* Passage::add_edge(unsigned layer_id, Node *node1, Node *node2, string type) {
+  Edge *edge = new Edge(node1, node2, type);
+  auto key = make_pair(node1->id, node2->id);
+  edges[key] = edge;
+  layers[layer_id]->edges[key] = edge;
+  node1->outgoing[node2->id] = edge;
+  node2->incoming[node1->id] = edge;
+  return edge;
+}
+
+Edge* Passage::add_edge(unsigned layer_id, string id1, string id2, string type) {
+  return add_edge(layer_id, nodes[id1], nodes[id2], type);
+}
+
+Edge* Passage::add_edge(unsigned layer_id1, unsigned position1, unsigned layer_id2, unsigned position2, string type) {
+  return add_edge(layer_id1, make_id(layer_id1, position1), make_id(layer_id2, position2), type);
+}
+
+Edge *Passage::add_edge(unsigned layer_id, Node *node1, string id2, string type) {
+  Edge *edge = new Edge(node1, id2, type);
+  auto key = make_pair(node1->id, id2);
+  edges[key] = edge;
+  layers[layer_id]->edges[key] = edge;
+  node1->outgoing[id2] = edge;
+  return edge;
+}
+
+Layer::Layer(unsigned id) : id(id) {}
 Layer::~Layer() {}
 
-Node::Node(string id, string type)
+Node::Node(Layer *layer, string id, string type)
     : id(id), type(type),
       paragraph(0), paragraph_position(0), text(""),
-      implicit(false), uncertain(false), remarks("") {}
+      implicit(false), uncertain(false), remarks(""),
+      layer(layer) {}
 
 Node::~Node() {}
 
+Edge::Edge(Node* from, Node* to, string type)
+    : Edge(from, to, type, to->id) {}
+
 Edge::Edge(Node* from, string to_id, string type)
-    : type(type), remote(false), from(from), to_id(to_id) {}
+    : Edge(from, nullptr, type, to_id) {}
+
+Edge::Edge(Node* from, Node* to, string type, string to_id)
+    : type(type), remote(false), from(from), to(to), to_id(to_id) {}
 
 Edge::~Edge() {}

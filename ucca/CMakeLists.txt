@@ -5,6 +5,8 @@ set(ucca_srcs
 set(ucca_headers
     passage.h
     ucca-corpus.h
+    cmp_id.h
+    exceptions.h
 )
 
 file(GLOB TEST_SRCS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} tests/*.cc)
