@@ -123,14 +123,10 @@ namespace ucca {
   public:
     friend class Passage;
 
-    Edge(Node *from, Node *to, std::string type);
+    Edge(Node *from, Node *to, std::string type, std::string to_id=to->id);
     Edge(Node *from, std::string to_id, std::string type);
     ~Edge();
 
-  private:
-    Edge(Node *from, Node *to, std::string type, std::string to_id);
-
-  public:
     std::string type;
     bool remote;
     Node *from;

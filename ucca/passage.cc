@@ -301,13 +301,10 @@ Node::Node(Layer *layer, string id, string type)
 
 Node::~Node() {}
 
-Edge::Edge(Node* from, Node* to, string type)
-    : Edge(from, to, type, to->id) {}
+Edge::Edge(Node* from, Node* to, string type, string to_id)
+    : type(type), remote(false), from(from), to(to), to_id(to_id) {}
 
 Edge::Edge(Node* from, string to_id, string type)
     : Edge(from, nullptr, type, to_id) {}
-
-Edge::Edge(Node* from, Node* to, string type, string to_id)
-    : type(type), remote(false), from(from), to(to), to_id(to_id) {}
 
 Edge::~Edge() {}

@@ -24,9 +24,12 @@ namespace ucca {
   static const char *const SWAP = "SWAP";
   static const char *const LEFT_ARC = "LEFT-ARC";
   static const char *const RIGHT_ARC = "RIGHT-ARC";
+  static const char *const LEFT_REMOTE = "LEFT-REMOTE";
+  static const char *const RIGHT_REMOTE = "RIGHT-REMOTE";
+  static const char *const REDUCE = "REDUCE";
   static const char *const PROMOTE = "PROMOTE";
-  static const char *const REMOTE = "REMOTE";
-  static const char *const NO_OP = "NO-OP";
+
+  static const char *const REMOTE_PREFIX = "*";
 
   class Corpus {
   public:
